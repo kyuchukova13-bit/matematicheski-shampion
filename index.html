@@ -1,0 +1,371 @@
+
+
+       <!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <title>МАТЕМАТИЧЕСКИ ШАМПИОН - ФИНАЛ</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap');
+        
+        body { 
+            margin: 0; font-family: 'Montserrat', sans-serif; 
+            background: #f0f4f8; overflow: hidden; 
+            display: flex; flex-direction: column; align-items: center; 
+        }
+
+        /* ГОРНА ЛЕНТА */
+        .top-bar {
+            width: 100%; padding: 15px 40px; background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+            box-sizing: border-box; z-index: 100;
+        }
+
+        .stats-wrapper { display: flex; gap: 20px; }
+        .info-badge {
+            font-size: 1.4em; font-weight: 900; padding: 10px 25px;
+            border-radius: 20px; border: 3px solid; display: flex; align-items: center; gap: 10px;
+        }
+        .pts-green { background: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
+        .err-red { background: #ffebee; color: #c62828; border-color: #c62828; }
+
+        .menu-btn {
+            background: #ff9800; color: white; font-size: 1.2em; font-weight: 700;
+            padding: 10px 30px; border-radius: 20px; border: none; cursor: pointer;
+            box-shadow: 0 5px #f57c00; transition: 0.2s;
+        }
+        .menu-btn:active { transform: translateY(3px); box-shadow: none; }
+
+        /* ЗАДАЧА */
+        .task-area { margin-top: 20px; z-index: 10; text-align: center; }
+        .task-card { 
+            display: inline-block; padding: 10px 60px; 
+            background: white; border-radius: 40px; 
+            border: 8px solid #2e7d32; color: #1b5e20; 
+            font-size: 4em; font-weight: 900; 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        }
+
+        /* ИГРОВО ПОЛЕ */
+        .game-area { 
+            display: flex; align-items: flex-start; justify-content: center; 
+            width: 100%; height: 65vh; gap: 30px; margin-top: 20px;
+        }
+        
+        .side-col { 
+            width: 280px; display: flex; flex-direction: column; 
+            align-items: center; position: relative; 
+        }
+
+        .ans-circle { 
+            width: 160px; height: 160px; background: #2e7d32; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; 
+            border: 8px solid white; box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
+            transition: transform 0.2s; position: relative; z-index: 2;
+            margin-bottom: 20px; 
+        }
+        .ans-circle h2 { font-size: 4.5em; color: white; margin: 0; }
+
+        .gesture-hint { 
+            width: 200px; height: 200px; object-fit: contain; 
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.1));
+        }
+
+        #cam-frame { 
+            width: 520px; height: 390px; background: black; 
+            border: 12px solid white; border-radius: 40px; 
+            overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3); 
+            position: relative; margin-top: 20px;
+        }
+
+        /* ЕФЕКТИ */
+        .loading-anim { border-color: #ffeb3b !important; transform: scale(1.1); }
+        .success-anim { background: #4caf50 !important; border-color: #ffd700 !important; transform: scale(1.2); }
+        .error-anim { background: #f44336 !important; animation: shake 0.4s; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+
+        /* МОДАЛНИ ПРОЗОРЦИ (МЕНЮ) */
+        .overlay { 
+            position: fixed; inset: 0; background: rgba(255,255,255,0.98); 
+            z-index: 9999; display: flex; align-items: center; justify-content: center; 
+        }
+        .modal { 
+            background: white; padding: 50px; border-radius: 40px; 
+            box-shadow: 0 30px 60px rgba(0,0,0,0.2); text-align: center; 
+            border: 5px solid #f0f4f8; max-width: 900px;
+        }
+        .modal h1 { color: #1b5e20; font-size: 3em; margin: 0 0 10px 0; }
+        
+        .lvl-grid { display: flex; gap: 20px; justify-content: center; margin-top: 30px; }
+        .lvl-card { 
+            padding: 25px; border-radius: 30px; border: 3px solid #eee; 
+            cursor: pointer; transition: 0.3s; background: white; min-width: 200px;
+        }
+        .lvl-card:hover { border-color: #2e7d32; transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .lvl-card h2 { color: #2e7d32; margin: 0; font-size: 1.6em; }
+        .lvl-card p { margin: 5px 0 0 0; color: #555; }
+
+        #win-view { display: none; background: rgba(0,0,0,0.9); }
+        .trophy-icon { font-size: 80px; display: block; margin-bottom: 20px; animation: bounce 1s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="stats-wrapper">
+            <div class="info-badge pts-green">🏆 <span id="scoreVal">0</span> / 100</div>
+            <div class="info-badge err-red">❌ <span id="errVal">0</span></div>
+        </div>
+        <button class="menu-btn" onclick="showMenu()">🏠 МЕНЮ</button>
+    </div>
+
+    <div class="task-area">
+        <div class="task-card" id="taskText">?</div>
+    </div>
+
+    <div class="game-area">
+        <div class="side-col">
+            <div id="circL" class="ans-circle"><h2 id="ansL">0</h2></div>
+            <img id="imgL" class="gesture-hint" src="">
+        </div>
+        
+        <div id="cam-frame"></div>
+        
+        <div class="side-col">
+            <div id="circR" class="ans-circle"><h2 id="ansR">0</h2></div>
+            <img id="imgR" class="gesture-hint" src="">
+        </div>
+    </div>
+
+   <div id="start-view" class="overlay">
+        <div class="modal">
+            <h1>МАТЕМАТИЧЕСКИ ШАМПИОН</h1>
+            <p style="font-size: 1.3em; color: #555;">Избери ниво и застани пред камерата!</p>
+            <div class="lvl-grid">
+                <div class="lvl-card" onclick="initLevel(1)">
+                    <h2>НИВО 1</h2><p>До 10</p><small>Една ръка горе</small>
+                </div>
+                <div class="lvl-card" onclick="initLevel(2)">
+                    <h2>НИВО 2</h2><p>До 20</p><small>Глава / Самолет</small>
+                </div>
+                <div class="lvl-card" onclick="initLevel(3)">
+                    <h2>НИВО 3</h2><p>Преминаване</p><small>Събрани / Победа</small>
+                </div>
+            </div>
+
+            <p style="margin-top: 25px; color: #546e7a; font-weight: bold; font-size: 1.1em;">Създадено от: ДОЧКА КЮЧУКОВА</p>
+            
+        </div>
+    </div>
+
+    <div id="win-view" class="overlay">
+        <div class="modal" style="border-top: 15px solid gold;">
+            <div class="trophy-icon">🏆</div>
+            <h1 style="color: #f57c00;">ПОЗДРАВЛЕНИЯ!</h1>
+            <div style="font-size: 1.5em; margin: 20px 0; color: #333;">
+                <p>Краен резултат: <b>100</b></p>
+                <p>Грешки: <b id="finalErrs" style="color:red">0</b></p>
+            </div>
+            <div class="lvl-grid">
+                <button class="menu-btn" onclick="showMenu()">🏠 МЕНЮ</button>
+                <button class="menu-btn" style="border-color: #2e7d32;" onclick="replayLevel()">🔄 ОТНОВО</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let video, poseNet, poses = [];
+    let level = 1, currentRes = 0, score = 0, errors = 0;
+    let active = false, holdFrames = 0, lastMove = null;
+
+    // --- ФУНКЦИИ ЗА НАВИГАЦИЯ (БЕЗ ПРЕЗАРЕЖДАНЕ) ---
+    function showMenu() {
+        active = false; 
+        document.getElementById('start-view').style.display = 'flex'; 
+        document.getElementById('win-view').style.display = 'none'; 
+    }
+
+    function replayLevel() {
+        initLevel(level); 
+    }
+
+    function initLevel(l) {
+        level = l;
+        score = 0; errors = 0;
+        document.getElementById('scoreVal').innerText = 0;
+        document.getElementById('errVal').innerText = 0;
+        
+        document.getElementById('start-view').style.display = 'none';
+        document.getElementById('win-view').style.display = 'none';
+
+        // НАСТРОЙКА НА КАРТИНКИТЕ
+        if(level === 1) {
+            document.getElementById('imgL').src = "level1_left.png";
+            document.getElementById('imgR').src = "level1_right.png";
+        } else if(level === 2) {
+            document.getElementById('imgL').src = "level2_head.png";   // Ръце на главата
+            document.getElementById('imgR').src = "level2_plane.png";  // Самолет
+        } else {
+            // НИВО 3 - ФИНАЛНО
+            document.getElementById('imgL').src = "level3_left.png";  // Ръце СЪБРАНИ (Молитва)
+            document.getElementById('imgR').src = "level3_right.png"; // Ръце ГОРЕ (Победа)
+        }
+
+        generateMath();
+    }
+
+    function generateMath() {
+        active = false; holdFrames = 0; lastMove = null;
+        
+        document.getElementById('circL').className = 'ans-circle';
+        document.getElementById('circR').className = 'ans-circle';
+        document.getElementById('taskText').style.background = 'white';
+        document.getElementById('taskText').style.color = '#1b5e20';
+
+        let a, b, op = Math.random() > 0.5 ? '+' : '-';
+
+        if (level === 1) { 
+            if(op==='+') { a = r(0,11); b = r(0,11-a); }
+            else { a = r(0,11); b = r(0,a+1); }
+        } else if (level === 2) {
+            if(op==='+') { a = r(10,16); b = r(0,21-a); } 
+            else { a = r(10,21); b = r(0, a-9); } 
+        } else {
+            if(op==='+') { a = r(5,10); b = r(11-a, 10); } 
+            else { a = r(11,19); b = r(a-9, 10); }
+        }
+
+        currentRes = op==='+' ? a+b : a-b;
+        if(currentRes < 0) currentRes = 0; 
+        
+        document.getElementById('taskText').innerText = `${a} ${op} ${b}`;
+
+        let wrong = currentRes + (Math.random()>0.5 ? 2 : -2);
+        if(wrong === currentRes || wrong < 0) wrong = currentRes + 1;
+
+        if(Math.random() > 0.5) {
+            document.getElementById('ansL').innerText = currentRes;
+            document.getElementById('ansR').innerText = wrong;
+        } else {
+            document.getElementById('ansL').innerText = wrong;
+            document.getElementById('ansR').innerText = currentRes;
+        }
+
+        setTimeout(() => { active = true; }, 1000);
+    }
+
+    function setup() {
+        let cnv = createCanvas(520, 390);
+        cnv.parent('cam-frame');
+        video = createCapture(VIDEO);
+        video.size(520, 390);
+        video.hide();
+        poseNet = ml5.poseNet(video, { flipHorizontal: true, detectionType: 'single' });
+        poseNet.on('pose', results => poses = results);
+    }
+
+    function draw() {
+        push(); translate(width, 0); scale(-1, 1);
+        image(video, 0, 0, width, height);
+        
+        // Показваме китките за дебъг
+        if(poses.length > 0) {
+            let p = poses[0].pose;
+            fill(0,255,0); noStroke();
+            if(p.leftWrist.confidence > 0.3) ellipse(p.leftWrist.x, p.leftWrist.y, 15);
+            if(p.rightWrist.confidence > 0.3) ellipse(p.rightWrist.x, p.rightWrist.y, 15);
+        }
+        pop();
+
+        if(!active || poses.length === 0) return;
+
+        let p = poses[0].pose;
+        let detected = null;
+
+        if (level === 1) {
+            // ЛЯВА/ДЯСНА ЗОНА
+            let leftUp = p.leftWrist.y < p.nose.y || p.rightWrist.y < p.nose.y;
+            let inLeftZone = p.leftWrist.x < 260 || p.rightWrist.x < 260;
+            let inRightZone = p.leftWrist.x > 260 || p.rightWrist.x > 260;
+
+            if (leftUp && inLeftZone && !inRightZone) detected = 'L';
+            if (leftUp && inRightZone && !inLeftZone) detected = 'R';
+        } 
+        else if (level === 2) {
+            // ГЛАВА vs САМОЛЕТ
+            let isHead = (p.leftWrist.y < p.nose.y && p.rightWrist.y < p.nose.y); // И двете горе
+            
+            let distW = dist(p.leftWrist.x, p.leftWrist.y, p.rightWrist.x, p.rightWrist.y);
+            let notTooHigh = (p.leftWrist.y > p.nose.y - 50 && p.rightWrist.y > p.nose.y - 50);
+            let isPlane = (distW > 250 && notTooHigh); // Широко разперени
+
+            if (isHead) detected = 'L';    
+            if (isPlane) detected = 'R';   
+        } 
+        else if (level === 3) {
+            // СЪБРАНИ (Пляс) vs РЪЦЕ ГОРЕ (Победа)
+            let d = dist(p.leftWrist.x, p.leftWrist.y, p.rightWrist.x, p.rightWrist.y);
+            let bothHandsUp = (p.leftWrist.y < p.nose.y && p.rightWrist.y < p.nose.y);
+
+            // ЛЯВ ОТГОВОР: Ръцете са много близо (Пляс/Молитва) - d < 80
+            if (d < 80) detected = 'L';
+
+            // ДЕСЕН ОТГОВОР: Ръцете са ГОРЕ и ДАЛЕЧЕ (V-образна победа) - d > 200
+            if (d > 200 && bothHandsUp) detected = 'R';
+        }
+
+        if(detected) {
+            if(detected === lastMove) {
+                holdFrames++;
+                document.getElementById('circ' + detected).classList.add('loading-anim');
+                if(holdFrames > 30) checkAns(detected); 
+            } else {
+                holdFrames = 0; lastMove = detected; resetAnim();
+            }
+        } else {
+            holdFrames = 0; lastMove = null; resetAnim();
+        }
+    }
+
+    function resetAnim() {
+        document.getElementById('circL').classList.remove('loading-anim');
+        document.getElementById('circR').classList.remove('loading-anim');
+    }
+
+    function checkAns(side) {
+        active = false; resetAnim();
+        let val = parseInt(document.getElementById('ans' + side).innerText);
+
+        if(val === currentRes) {
+            score += 10;
+            document.getElementById('scoreVal').innerText = score;
+            document.getElementById('circ' + side).classList.add('success-anim');
+            document.getElementById('taskText').innerText = "БРАВО!";
+            document.getElementById('taskText').style.background = '#4caf50';
+            document.getElementById('taskText').style.color = 'white';
+            
+            if(score >= 100) {
+                document.getElementById('finalErrs').innerText = errors;
+                setTimeout(() => { document.getElementById('win-view').style.display = 'flex'; }, 1000);
+            } else {
+                setTimeout(generateMath, 2000);
+            }
+        } else {
+            errors++;
+            document.getElementById('errVal').innerText = errors;
+            document.getElementById('circ' + side).classList.add('error-anim');
+            setTimeout(() => {
+                document.getElementById('circ' + side).classList.remove('error-anim');
+                active = true; holdFrames = 0; 
+            }, 1000);
+        }
+    }
+
+    function r(min, max) { return Math.floor(Math.random() * (max - min) + min); }
+</script>
+</body>
+</html>
