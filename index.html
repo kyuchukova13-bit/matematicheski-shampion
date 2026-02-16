@@ -111,6 +111,28 @@
         #win-view { display: none; background: rgba(0,0,0,0.9); }
         .trophy-icon { font-size: 80px; display: block; margin-bottom: 20px; animation: bounce 1s infinite; }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+/* БУТОН СЛЕДВАЩА ЗАДАЧА */
+.skip-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 40px;
+    background: #455a64;
+    color: white;
+    font-size: 1.2em;
+    font-weight: 700;
+    padding: 15px 30px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 6px #263238;
+    transition: 0.2s;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.skip-btn:hover { background: #546e7a; }
+.skip-btn:active { transform: translateY(3px); box-shadow: none; }
     </style>
 </head>
 <body>
@@ -182,11 +204,12 @@
     let level = 1, currentRes = 0, score = 0, errors = 0;
     let active = false, holdFrames = 0, lastMove = null;
 
-    // --- ФУНКЦИИ ЗА НАВИГАЦИЯ (БЕЗ ПРЕЗАРЕЖДАНЕ) ---
+    // --- ФУНКЦИИ ЗА НАВИГАЦИЯ ---
     function showMenu() {
         active = false; 
         document.getElementById('start-view').style.display = 'flex'; 
-        document.getElementById('win-view').style.display = 'none'; 
+        document.getElementById('win-view').style.display = 'none';
+        document.getElementById('skipBtn').style.display = 'none'; // Скриваме бутона в менюто
     }
 
     function replayLevel() {
@@ -196,23 +219,23 @@
     function initLevel(l) {
         level = l;
         score = 0; errors = 0;
-        document.getElementById('scoreVal').innerText = 0;
-        document.getElementById('errVal').innerText = 0;
+        document.getElementById('scoreVal').innerText = score;
+        document.getElementById('errVal').innerText = errors;
         
         document.getElementById('start-view').style.display = 'none';
         document.getElementById('win-view').style.display = 'none';
+        document.getElementById('skipBtn').style.display = 'flex'; // Показваме бутона при старт на ниво
 
-        // НАСТРОЙКА НА КАРТИНКИТЕ
+        // НАСТРОЙКА НА КАРТИНКИТЕ СПРЕД НИВОТО
         if(level === 1) {
             document.getElementById('imgL').src = "level1_left.png";
             document.getElementById('imgR').src = "level1_right.png";
         } else if(level === 2) {
-            document.getElementById('imgL').src = "level2_head.png";   // Ръце на главата
-            document.getElementById('imgR').src = "level2_plane.png";  // Самолет
-        } else {
-            // НИВО 3 - ФИНАЛНО
-            document.getElementById('imgL').src = "level3_left.png";  // Ръце СЪБРАНИ (Молитва)
-            document.getElementById('imgR').src = "level3_right.png"; // Ръце ГОРЕ (Победа)
+            document.getElementById('imgL').src = "level2_head.png"; 
+            document.getElementById('imgR').src = "level2_plane.png";
+        } else if(level === 3) {
+            document.getElementById('imgL').src = "level3_left.png"; 
+            document.getElementById('imgR').src = "level3_right.png";
         }
 
         generateMath();
@@ -258,6 +281,15 @@
         setTimeout(() => { active = true; }, 1000);
     }
 
+    // ЛОГИКА ЗА БУТОНА ЗА ПРОПУСКАНЕ
+    function skipTask() {
+        if (!active && score < 100) return; 
+        document.getElementById('taskText').innerText = "ПРОПУСКАНЕ...";
+        document.getElementById('taskText').style.background = '#90a4ae';
+        document.getElementById('taskText').style.color = 'white';
+        setTimeout(generateMath, 800);
+    }
+
     function setup() {
         let cnv = createCanvas(520, 390);
         cnv.parent('cam-frame');
@@ -272,7 +304,6 @@
         push(); translate(width, 0); scale(-1, 1);
         image(video, 0, 0, width, height);
         
-        // Показваме китките за дебъг
         if(poses.length > 0) {
             let p = poses[0].pose;
             fill(0,255,0); noStroke();
@@ -286,35 +317,26 @@
         let p = poses[0].pose;
         let detected = null;
 
+        // ДЕТЕКЦИЯ ПО НИВА
         if (level === 1) {
-            // ЛЯВА/ДЯСНА ЗОНА
             let leftUp = p.leftWrist.y < p.nose.y || p.rightWrist.y < p.nose.y;
             let inLeftZone = p.leftWrist.x < 260 || p.rightWrist.x < 260;
             let inRightZone = p.leftWrist.x > 260 || p.rightWrist.x > 260;
-
             if (leftUp && inLeftZone && !inRightZone) detected = 'L';
             if (leftUp && inRightZone && !inLeftZone) detected = 'R';
         } 
         else if (level === 2) {
-            // ГЛАВА vs САМОЛЕТ
-            let isHead = (p.leftWrist.y < p.nose.y && p.rightWrist.y < p.nose.y); // И двете горе
-            
+            let isHead = (p.leftWrist.y < p.nose.y && p.rightWrist.y < p.nose.y);
             let distW = dist(p.leftWrist.x, p.leftWrist.y, p.rightWrist.x, p.rightWrist.y);
             let notTooHigh = (p.leftWrist.y > p.nose.y - 50 && p.rightWrist.y > p.nose.y - 50);
-            let isPlane = (distW > 250 && notTooHigh); // Широко разперени
-
+            let isPlane = (distW > 250 && notTooHigh);
             if (isHead) detected = 'L';    
             if (isPlane) detected = 'R';   
         } 
         else if (level === 3) {
-            // СЪБРАНИ (Пляс) vs РЪЦЕ ГОРЕ (Победа)
             let d = dist(p.leftWrist.x, p.leftWrist.y, p.rightWrist.x, p.rightWrist.y);
             let bothHandsUp = (p.leftWrist.y < p.nose.y && p.rightWrist.y < p.nose.y);
-
-            // ЛЯВ ОТГОВОР: Ръцете са много близо (Пляс/Молитва) - d < 80
             if (d < 80) detected = 'L';
-
-            // ДЕСЕН ОТГОВОР: Ръцете са ГОРЕ и ДАЛЕЧЕ (V-образна победа) - d > 200
             if (d > 200 && bothHandsUp) detected = 'R';
         }
 
@@ -350,6 +372,7 @@
             
             if(score >= 100) {
                 document.getElementById('finalErrs').innerText = errors;
+                document.getElementById('skipBtn').style.display = 'none'; // Скриваме бутона при финал
                 setTimeout(() => { document.getElementById('win-view').style.display = 'flex'; }, 1000);
             } else {
                 setTimeout(generateMath, 2000);
@@ -367,5 +390,6 @@
 
     function r(min, max) { return Math.floor(Math.random() * (max - min) + min); }
 </script>
+<button id="skipBtn" class="skip-btn" onclick="skipTask()">СЛЕДВАЩА ⏭️</button>
 </body>
 </html>
